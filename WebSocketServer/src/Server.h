@@ -1,5 +1,5 @@
 //
-// Created by ubuntu on 2/20/22.
+// Created by xuzhenhai on 2/20/22.
 //
 
 #ifndef PUPPY_SERVER_H
@@ -31,6 +31,14 @@ struct Server {
                                                                                                          disposeClient) {
         _loginCheckExecutor = std::make_shared<puppy::common::Executor>(3);
         _heartBeatExecutor = std::make_shared<puppy::common::Executor>(3);
+    }
+
+    Server() {
+
+    }
+
+    ~Server() {
+
     }
 
     void onNewClient(Client client) {
@@ -73,24 +81,24 @@ struct Server {
         }
     }
 
-    Auth getAuth(Client client){
+    Auth getAuth(Client client) {
         auto lock = _validClients->rlock();
-        std::find_if(lock->begin(),lock->end(),[&,client](auto & token){
-            return token.get<2>()==client;
+        std::find_if(lock->begin(), lock->end(), [&, client](auto &token) {
+            return std::get<2>(token) == client;
         });
     }
 
-    Client getClient(Auth auth){
+    Client getClient(Auth auth) {
         auto lock = _validClients->rlock();
-        std::find_if(lock->begin(),lock->end(),[&,auth](auto & token){
-            return token.get<1>()==auth;
+        std::find_if(lock->begin(), lock->end(), [&, auth](auto &token) {
+            return std::get<1>(token) == auth;
         });
     }
 
 private:
 
-    void closeClient(Client client){
-        _heartBeatExecutor->postTask([&,client](){
+    void closeClient(Client client) {
+        _heartBeatExecutor->postTask([&, client]() {
             _disposeClient(client);
         });
     }
@@ -103,7 +111,7 @@ private:
     bool checkClient(Client client) {
         if (client) {
             auto lock = _validClients->rlock();
-            return std::find(lock->begin(), lock->end(), client) != lock->end()
+            return std::find(lock->begin(), lock->end(), client) != lock->end();
         }
     }
 
@@ -122,11 +130,14 @@ private:
             auto current = timeSinceEpochMillisec();
             size_t n = lock->size();
             for (int i = 0; i < n; i++) {
-                if (current - lock->at(i).get<3>() > 3000) {
-                    _disposeClient(current - lock->at(i).get<2>());
+                auto &item = lock->at(i);
+                if (current - std::get<3>(item) > 3000) {
+                    _disposeClient(current - std::get<2>(item));
+                } else {
+                    std::get<3>(item) = current;
                 }
             }
-        }, 1)
+        }, 1);
     }
 
     Decoder _decoder;

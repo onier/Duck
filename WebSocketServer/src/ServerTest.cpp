@@ -36,7 +36,33 @@ void on_message(server *s, websocketpp::connection_hdl hdl, message_ptr msg) {
     }
 }
 
+
+
 int main() {
+    auto decoder = [](Message msg) {
+        folly::dynamic md;
+        md["type"] = msg.type;
+        md["content"] = msg.content;
+        return folly::toJson(md);
+    };
+    auto encoder = [](std::string msg) -> Message {
+        folly::dynamic data = folly::parseJson(msg);
+        return {data["type"].asString(), data["content"].asString()};
+    };
+
+    auto messageHandler = [](Message msg, websocketpp::connection_hdl client) {
+        LOG(INFO) << msg.type << "  " << msg.content;
+    };
+
+    auto checkAuth = [](std::string msg) -> User {
+        return {"A","B"};
+    };
+
+
+    std::shared_ptr<MyServe> myServe;
+}
+
+int main1() {
     using namespace std::chrono;
     long millisec = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
     sleep(3);
@@ -57,7 +83,7 @@ int main() {
             LOG(INFO) << " socket is open ";
         });
         echo_server.set_message_handler(bind(&on_message, &echo_server, ::_1, ::_2));
-        echo_server.set_close_handler([](websocketpp::connection_hdl client){
+        echo_server.set_close_handler([](websocketpp::connection_hdl client) {
             LOG(INFO) << " socket is close ";
         });
         // Listen on port 9002
