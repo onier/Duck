@@ -45,6 +45,19 @@ class WebSocketServer : public Server<websocketpp::connection_hdl, Message, User
 public:
     WebSocketServer(const Decoder &decoder, const Encoder &encoder, const CheckAuth &checkAuth,
                     const DisposeClient &disposeClient);
+
+    WebSocketServer();
+
+private:
+    void init();
+
+    Message decoder(std::string text);
+
+    std::string encoder(Message msg);
+
+    User checkAuth(std::string text);
+
+    void disposeClient(websocketpp::connection_hdl client);
 };
 
 
