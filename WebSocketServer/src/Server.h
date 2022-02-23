@@ -139,7 +139,7 @@ private:
             }
         }, 1);
     }
-
+protected:
     Decoder _decoder;
     Encoder _encoder;
     CheckAuth _checkAuth;
