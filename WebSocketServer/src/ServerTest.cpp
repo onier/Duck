@@ -1,10 +1,11 @@
 #include <websocketpp/config/asio_no_tls.hpp>
-
+#include "nlohmann/json.hpp"
 #include <websocketpp/server.hpp>
 
 #include <iostream>
 #include "glog/logging.h"
 #include "chrono"
+#include "Server.h"
 
 typedef websocketpp::server<websocketpp::config::asio> server;
 
@@ -39,27 +40,65 @@ void on_message(server *s, websocketpp::connection_hdl hdl, message_ptr msg) {
 
 
 int main() {
-    auto decoder = [](Message msg) {
-        folly::dynamic md;
-        md["type"] = msg.type;
-        md["content"] = msg.content;
-        return folly::toJson(md);
+    std::shared_ptr<server> echo_server = std::make_shared<server>();
+    auto decoder = [](nlohmann::json msg) {
+        return msg.dump();
     };
-    auto encoder = [](std::string msg) -> Message {
-        folly::dynamic data = folly::parseJson(msg);
-        return {data["type"].asString(), data["content"].asString()};
+    auto encoder = [](std::string msg) -> nlohmann::json {
+        return nlohmann::json::parse(msg);
     };
 
-    auto messageHandler = [](Message msg, websocketpp::connection_hdl client) {
-        LOG(INFO) << msg.type << "  " << msg.content;
+    auto messageHandler = [](nlohmann::json msg,std::shared_ptr<void> client) {
+        LOG(INFO) << msg.dump();
     };
 
-    auto checkAuth = [](std::string msg) -> User {
-        return {"A","B"};
+    auto checkAuth = [](std::string msg) -> nlohmann::json {
+        return nlohmann::json::parse(msg);
     };
 
+    auto closeClient = [echo_server](std::shared_ptr<void> hdl){
+        websocketpp::lib::error_code ec;
+        echo_server->close(hdl, websocketpp::close::status::going_away, "", ec);
+        if (ec) {
+            std::cout << "> Error closing connection " ;
+        }
+    };
 
-    std::shared_ptr<MyServe> myServe;
+    typedef Server<std::shared_ptr<void>, nlohmann::json, nlohmann::json> MyServer;
+    std::shared_ptr<MyServer> myserver = std::make_shared<MyServer>(decoder,encoder,checkAuth,closeClient);
+    myserver->addHandler("Test",messageHandler);
+
+    try {
+        // Set logging settings
+        echo_server->set_access_channels(websocketpp::log::alevel::all);
+        echo_server->clear_access_channels(websocketpp::log::alevel::frame_payload);
+
+        echo_server->set_reuse_addr(true);
+        // Initialize Asio
+        echo_server->init_asio();
+        // Register our message handler
+        echo_server->set_open_handler([myserver](websocketpp::connection_hdl client) {
+            myserver->onNewClient(client.lock());
+        });
+        echo_server->set_message_handler([myserver]( websocketpp::connection_hdl hdl, message_ptr msg){
+            myserver->onMessage(hdl.lock(),msg->get_payload());
+        });
+        echo_server->set_close_handler([myserver](websocketpp::connection_hdl client) {
+            myserver->onCloseClient(client.lock());
+        });
+        // Listen on port 9002
+        echo_server->listen(9002);
+
+        // Start the server accept loop
+        echo_server->start_accept();
+
+        // Start the ASIO io_service run loop
+        echo_server->run();
+    } catch (websocketpp::exception const &e) {
+        std::cout << e.what() << std::endl;
+    } catch (...) {
+        std::cout << "other exception" << std::endl;
+    }
 }
 
 int main1() {

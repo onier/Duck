@@ -42,25 +42,29 @@ struct Server {
     }
 
     void onNewClient(Client client) {
-        _openConnectClients->wlock()->push_back(client);
+        _openConnectClients.wlock()->push_back(client);
         checkClientLogin(client);
     }
 
-    void onCloseClient(Client client) {
+    void onCloseClient( Client client) {
         {
-            auto lock = _openConnectClients->wlock();
-            auto p = std::remove_if(lock->begin(), lock->end(), client);
+            auto lock = _openConnectClients.wlock();
+            auto p = std::remove_if(lock->begin(), lock->end(), [client]( auto& c){
+                return client==c;
+            });
             lock->erase(p);
         }
         {
-            auto lock = _validClients->wlock();
-            auto p = std::remove_if(lock->begin(), lock->end(), client);
+            auto lock = _validClients.wlock();
+            auto p = std::remove_if(lock->begin(), lock->end(), [client]( auto& c){
+                return std::get<1>(c) == client;
+            });
             lock->erase(p);
         }
     }
 
     void onMessage(Client client, std::string message) {
-        if (!checkClient()) {
+        if (!checkClient(client)) {
             LOG(ERROR) << " client check fail ,the client is not login";
             auto auth = _checkAuth(message);
             if (!auth) {
@@ -69,30 +73,34 @@ struct Server {
                 return;
             } else {
                 LOG(INFO) << " check user pass add new login user";
-                _validClients->wlock()->push_back(std::make_tuple(auth, client, timeSinceEpochMillisec()));
+                _validClients.wlock()->push_back(std::make_tuple(auth, client, timeSinceEpochMillisec()));
             }
         }
 
         Message msg = _decoder(message);
         try {
-            _handlers->rlock()->operator[](msg->getType)(message, client);
+            _handlers.rlock()->at(msg["type"])(message, client);
         } catch (...) {
             closeClient(client);
         }
     }
 
     Auth getAuth(Client client) {
-        auto lock = _validClients->rlock();
+        auto lock = _validClients.rlock();
         std::find_if(lock->begin(), lock->end(), [&, client](auto &token) {
             return std::get<2>(token) == client;
         });
     }
 
     Client getClient(Auth auth) {
-        auto lock = _validClients->rlock();
+        auto lock = _validClients.rlock();
         std::find_if(lock->begin(), lock->end(), [&, auth](auto &token) {
             return std::get<1>(token) == auth;
         });
+    }
+
+    void addHandler(std::string type,MessageHandler messageHandler){
+        _handlers.wlock()->insert({type,messageHandler});
     }
 
 private:
@@ -109,10 +117,12 @@ private:
     }
 
     bool checkClient(Client client) {
-        if (client) {
-            auto lock = _validClients->rlock();
-            return std::find(lock->begin(), lock->end(), client) != lock->end();
-        }
+//        if (client) {
+            auto lock = _validClients.rlock();
+            return std::find_if(lock->begin(), lock->end(), [client]( auto& c){
+                return std::get<1>(c) == client;
+            }) != lock->end();
+//        }
     }
 
     void checkClientLogin(Client client) {
@@ -126,7 +136,7 @@ private:
 
     void checkHeartBeat() {
         _heartBeatExecutor->postTimerTaskWithFixRate([&]() {
-            auto lock = _validClients->rlock();
+            auto lock = _validClients.rlock();
             auto current = timeSinceEpochMillisec();
             size_t n = lock->size();
             for (int i = 0; i < n; i++) {
@@ -139,7 +149,8 @@ private:
             }
         }, 1);
     }
-protected:
+
+public:
     Decoder _decoder;
     Encoder _encoder;
     CheckAuth _checkAuth;
