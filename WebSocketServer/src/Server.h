@@ -19,7 +19,7 @@ template<class Client, class Message, class Auth>
 struct Server {
     typedef std::function<Message(std::string)> Decoder;
     typedef std::function<std::string(Message)> Encoder;
-    typedef std::function<void(Message, Client)> MessageHandler;
+    typedef std::function<std::string(Message, Client)> MessageHandler;
     typedef std::function<Auth(std::string)> CheckAuth;
     typedef std::function<void(Client)> DisposeClient;
     typedef std::tuple<Auth, Client, uint64_t> Token;
@@ -31,6 +31,10 @@ struct Server {
                                                                                                          disposeClient) {
         _loginCheckExecutor = std::make_shared<puppy::common::Executor>(3);
         _heartBeatExecutor = std::make_shared<puppy::common::Executor>(3);
+        _enableHeartBeat = true;
+        _timeOutSecond = 5;
+        _timeOutInterval = 1;
+        checkHeartBeat();
     }
 
     Server() {
@@ -46,31 +50,35 @@ struct Server {
         checkClientLogin(client);
     }
 
-    void onCloseClient( Client client) {
+    void onCloseClient(Client client) {
         {
             auto lock = _openConnectClients.wlock();
-            auto p = std::remove_if(lock->begin(), lock->end(), [client]( auto& c){
-                return client==c;
+            auto p = std::remove_if(lock->begin(), lock->end(), [client](auto &c) {
+                return client == c;
             });
             lock->erase(p);
+            LOG(INFO) << "_openConnectClients size " << lock->size();
         }
         {
             auto lock = _validClients.wlock();
-            auto p = std::remove_if(lock->begin(), lock->end(), [client]( auto& c){
+            auto p = std::remove_if(lock->begin(), lock->end(), [client](auto &c) {
                 return std::get<1>(c) == client;
             });
-            lock->erase(p);
+            if (p) {
+                lock->erase(p);
+            }
+            LOG(INFO) << "_validClients size " << lock->size();
         }
     }
 
-    void onMessage(Client client, std::string message) {
+    std::string onMessage(Client client, std::string message) {
         if (!checkClient(client)) {
             LOG(ERROR) << " client check fail ,the client is not login";
             auto auth = _checkAuth(message);
-            if (!auth) {
+            if (auth.empty()) {
                 LOG(ERROR) << " dispost error for check fail";
                 closeClient(client);
-                return;
+                return "";
             } else {
                 LOG(INFO) << " check user pass add new login user";
                 _validClients.wlock()->push_back(std::make_tuple(auth, client, timeSinceEpochMillisec()));
@@ -78,11 +86,13 @@ struct Server {
         }
 
         Message msg = _decoder(message);
-        try {
-            _handlers.rlock()->at(msg["type"])(message, client);
-        } catch (...) {
-            closeClient(client);
-        }
+//        try {
+        std::string type = msg.at("type").template get<std::string>();
+        return _handlers.rlock()->at(type)(message, client);
+//        } catch (...) {
+//            closeClient(client);
+//        }
+        return "";
     }
 
     Auth getAuth(Client client) {
@@ -99,8 +109,8 @@ struct Server {
         });
     }
 
-    void addHandler(std::string type,MessageHandler messageHandler){
-        _handlers.wlock()->insert({type,messageHandler});
+    void addHandler(std::string type, MessageHandler messageHandler) {
+        _handlers.wlock()->insert({type, messageHandler});
     }
 
 private:
@@ -118,10 +128,10 @@ private:
 
     bool checkClient(Client client) {
 //        if (client) {
-            auto lock = _validClients.rlock();
-            return std::find_if(lock->begin(), lock->end(), [client]( auto& c){
-                return std::get<1>(c) == client;
-            }) != lock->end();
+        auto lock = _validClients.rlock();
+        return std::find_if(lock->begin(), lock->end(), [client](auto &c) {
+            return std::get<1>(c) == client;
+        }) != lock->end();
 //        }
     }
 
@@ -135,22 +145,34 @@ private:
     }
 
     void checkHeartBeat() {
-        _heartBeatExecutor->postTimerTaskWithFixRate([&]() {
-            auto lock = _validClients.rlock();
+        LOG(INFO)<<" start checkHeartBeat";
+        _heartBeatExecutor->postTimerTaskSecond([&]() {
+            auto lock = _validClients.wlock();
             auto current = timeSinceEpochMillisec();
             size_t n = lock->size();
             for (int i = 0; i < n; i++) {
                 auto &item = lock->at(i);
-                if (current - std::get<3>(item) > 3000) {
-                    _disposeClient(current - std::get<2>(item));
-                } else {
-                    std::get<3>(item) = current;
+                long temp= current - std::get<2>(item);
+                if (temp > _timeOutSecond * 1000) {
+                    if (_enableHeartBeat){
+                        LOG(ERROR)<<" close client for timeout";
+                        _disposeClient(std::get<1>(item));
+                    }
                 }
+//                else {
+//                    std::get<2>(item) = current;
+//                }
             }
-        }, 1);
+            _heartBeatExecutor->postTimerTaskSecond([&]() {
+                checkHeartBeat();
+            });
+        }, _timeOutInterval);
     }
 
 public:
+    bool _enableHeartBeat;
+    int _timeOutSecond;
+    int _timeOutInterval;
     Decoder _decoder;
     Encoder _encoder;
     CheckAuth _checkAuth;
