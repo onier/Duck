@@ -49,9 +49,7 @@ int main(int argc, char *argv[]) {
         msg["content"] = "        // Note that connect here only requests a connection. No network messages are";
         return msg.dump();
     });
-    if (1) {
-        return 1;
-    }
+     sleep(10000);
     if (argc == 2) {
         uri = argv[1];
     }

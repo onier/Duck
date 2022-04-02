@@ -8,7 +8,6 @@
 #include "functional"
 #include "folly/Synchronized.h"
 #include "folly/executors/CPUThreadPoolExecutor.h"
-#include "folly/futures/Future.h"
 #include "vector"
 #include "Executor.h"
 #include "folly/FBVector.h"
@@ -41,7 +40,7 @@ struct Server {
 
     }
 
-    ~Server() {
+    virtual ~Server() {
 
     }
 
@@ -69,6 +68,10 @@ struct Server {
             }
             LOG(INFO) << "_validClients size " << lock->size();
         }
+    }
+
+    void addValidClient(Auth auth,Client client){
+        _validClients.wlock()->push_back(std::make_tuple(auth, client, timeSinceEpochMillisec()));
     }
 
     std::string onMessage(Client client, std::string message) {

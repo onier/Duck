@@ -4,7 +4,6 @@
 
 #include "Client.h"
 #include "glog/logging.h"
-#include "folly/futures/Future.h"
 #include <chrono>
 #include <thread>
 
@@ -39,6 +38,25 @@ bool Client::sendMessage(std::string msg) {
     return false;
 }
 
+void Client::setAuthorize(Authorize authorize) {
+    _authorize = authorize;
+}
+
+void Client::setHeartbeat(Heartbeat heartbeat) {
+    _heartBeat = heartbeat;
+}
+
+void Client::sendHeartBeat() {
+    _sendExecutor->postTask([&](){
+        if(_heartBeat && _isConnected){
+            sendMessage(_heartBeat());
+        }
+        _sendExecutor->postTimerTaskSecond([&](){
+            sendHeartBeat();
+        },1);
+    });
+}
+
 void Client::initClient() {
     try {
         _isConnected = false;
@@ -52,12 +70,13 @@ void Client::initClient() {
         // Register our message handler
         _client->set_fail_handler([&](websocketpp::connection_hdl hdl) {
             _isConnected = false;
-            _executor->postTask([&]() {
-                initClient();
-            });
         });
         _client->set_open_handler([&](websocketpp::connection_hdl hdl) {
             _isConnected = true;
+            if (_authorize) {
+                sendMessage(_authorize());
+            }
+            sendHeartBeat();
             LOG(INFO) << " socket open";
         });
         _client->set_message_handler([&](websocketpp::connection_hdl hdl, message_ptr msg) {
@@ -79,6 +98,9 @@ void Client::initClient() {
         _client->connect(_currentConnection);
         _client->run();
         LOG(ERROR) << "connect fail";
+        _executor->postTimerTaskSecond([&]() {
+            initClient();
+        }, 1);
     } catch (...) {
 
     }

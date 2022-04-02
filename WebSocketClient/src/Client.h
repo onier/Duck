@@ -23,7 +23,8 @@ typedef websocketpp::config::asio_client::message_type::ptr message_ptr;
 typedef std::function<std::string(std::shared_ptr<void>, nlohmann::json)> MessageHandler;
 
 #include "Executor.h"
-
+typedef std::function<std::string()> Authorize;
+typedef std::function<std::string()> Heartbeat;
 class Client {
 public:
     Client(std::string url);
@@ -32,8 +33,14 @@ public:
 
     bool sendMessage(std::string msg);
 
+    void setAuthorize(Authorize authorize);
+
+    void setHeartbeat(Heartbeat heartbeat);
+
 private:
     void initClient();
+
+    void sendHeartBeat();
 
 private:
     std::shared_ptr<client> _client;
@@ -43,7 +50,8 @@ private:
     std::shared_ptr<puppy::common::Executor> _sendExecutor;
     std::atomic_bool _isConnected;
     client::connection_ptr _currentConnection;
-    std::mutex _sendMutex;
+    Authorize  _authorize;
+    Heartbeat _heartBeat;
 };
 
 

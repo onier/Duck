@@ -36,10 +36,14 @@ void on_message(server *s, websocketpp::connection_hdl hdl, message_ptr msg) {
                   << "(" << e.what() << ")" << std::endl;
     }
 }
-
-
-
-int main() {
+#include "WebSocketServer.h"
+#include "Library.h"
+int main(){
+    puppy::common::library::loadDefaultLibrary();
+    WebSocketServer webSocketServer(9002);
+    webSocketServer.start();
+}
+int main1() {
     std::shared_ptr<server> echo_server = std::make_shared<server>();
     auto  encoder= [](nlohmann::json msg) {
         return msg.dump();
