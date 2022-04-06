@@ -32,10 +32,10 @@ namespace Duck {
         struct WebSocketHandler {
             virtual ~WebSocketHandler();
 
-            virtual std::string getType() {};
+            virtual std::string getType() {return "";};
 
 //    <std::string(Message, Client)>
-            virtual std::string handMessage(nlohmann::json json, std::shared_ptr<void> client) {};
+            virtual std::string handMessage(nlohmann::json json, std::shared_ptr<void> client) {return "";};
 
             virtual void socketOpen() {};
 
@@ -58,6 +58,7 @@ namespace Duck {
 
             void connect();
 
+            bool isConnected();
         private:
             void initClient();
 
@@ -66,6 +67,7 @@ namespace Duck {
         private:
             std::shared_ptr<client> _client;
             std::string _url;
+            std::vector<std::shared_ptr<WebSocketHandler>> _handlers;
             std::map<std::string, MessageHandler> _messageHandler;
             std::shared_ptr<puppy::common::Executor> _executor;
             std::shared_ptr<puppy::common::Executor> _sendExecutor;

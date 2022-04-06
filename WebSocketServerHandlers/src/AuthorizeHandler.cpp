@@ -9,6 +9,9 @@ std::string AuthorizeHandler::getType() {
 }
 
 std::string AuthorizeHandler::handMessage(nlohmann::json json, std::shared_ptr<void> client) {
-    return "{}";
+    nlohmann::json jj;
+    jj["type"]="Authorize";
+    jj["content"]="";
+    return jj.dump();
 }
 

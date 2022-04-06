@@ -30,6 +30,7 @@ struct Server {
                                                                                                          disposeClient) {
         _loginCheckExecutor = std::make_shared<puppy::common::Executor>(3);
         _heartBeatExecutor = std::make_shared<puppy::common::Executor>(3);
+        _loginCheckExecutor = std::make_shared<puppy::common::Executor>(1);
         _enableHeartBeat = true;
         _timeOutSecond = 5;
         _timeOutInterval = 1;
@@ -37,7 +38,13 @@ struct Server {
     }
 
     Server() {
-
+        _loginCheckExecutor = std::make_shared<puppy::common::Executor>(3);
+        _heartBeatExecutor = std::make_shared<puppy::common::Executor>(3);
+        _loginCheckExecutor = std::make_shared<puppy::common::Executor>(1);
+        _enableHeartBeat = true;
+        _timeOutSecond = 5;
+        _timeOutInterval = 1;
+        checkHeartBeat();
     }
 
     virtual ~Server() {
@@ -84,8 +91,9 @@ struct Server {
                     LOG(ERROR) << " dispost error for check fail";
                     closeClient(client);
                     return "";
-                }else{
-                    _validClients.wlock()->push_back(std::make_tuple(_decoder(response), client, timeSinceEpochMillisec()));
+                } else {
+                    _validClients.wlock()->push_back(
+                            std::make_tuple(_decoder(response), client, timeSinceEpochMillisec()));
                     return response;
                 }
             } else {
@@ -126,7 +134,9 @@ private:
 
     void closeClient(Client client) {
         _heartBeatExecutor->postTask([&, client]() {
-            _disposeClient(client);
+            if (_disposeClient) {
+                _disposeClient(client);
+            }
         });
     }
 

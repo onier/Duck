@@ -6,9 +6,11 @@
 #define PUPPY_WEBCLIENTAUTHORIZEHANDLER_H
 
 #include "Client.h"
+#include "Executor.h"
 
 class WebClientAuthorizeHandler : public Duck::WebSocketClient::WebSocketHandler {
 public:
+    WebClientAuthorizeHandler();
 
     ~WebClientAuthorizeHandler() override;
 
@@ -18,6 +20,11 @@ public:
 
     void socketOpen() override;
 
+    void sendHeartBeat();
+
+private:
+    std::shared_ptr<puppy::common::Executor> _executor;
+    int _timesSecond;
 };
 
 

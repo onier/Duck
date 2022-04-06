@@ -20,6 +20,7 @@ void Client::addHandler(std::string type, MessageHandler function) {
 }
 
 bool Client::sendMessage(std::string msg) {
+    LOG(INFO)<<"send message "<<msg;
     if (_currentConnection && _isConnected) {
         try {
             const std::error_code &ret = _currentConnection->send(msg);
@@ -56,22 +57,29 @@ void Client::connect() {
 }
 
 void Client::addWebSocketHandler(std::shared_ptr<WebSocketHandler> webSocketHandler) {
+    _handlers.push_back(webSocketHandler);
     webSocketHandler->_webSocketServer = shared_from_this();
     addHandler(webSocketHandler->getType(),
                [webSocketHandler](std::shared_ptr<void> client, nlohmann::json json) -> std::string {
-                   webSocketHandler->handMessage(json, client);
+                  return webSocketHandler->handMessage(json, client);
                });
 }
 
 void Client::sendHeartBeat() {
-    _sendExecutor->postTask([&]() {
-        if (_heartBeat && _isConnected) {
-            sendMessage(_heartBeat());
-        }
-        _sendExecutor->postTimerTaskSecond([&]() {
-            sendHeartBeat();
-        }, 1);
-    });
+    if (_heartBeat) {
+        _sendExecutor->postTask([&]() {
+            if (_heartBeat && _isConnected) {
+                sendMessage(_heartBeat());
+            }
+            _sendExecutor->postTimerTaskSecond([&]() {
+                sendHeartBeat();
+            }, 1);
+        });
+    }
+}
+
+bool Client::isConnected() {
+    return _isConnected;
 }
 
 void Client::initClient() {
@@ -90,6 +98,10 @@ void Client::initClient() {
         });
         _client->set_open_handler([&](websocketpp::connection_hdl hdl) {
             _isConnected = true;
+            for(auto & h:_handlers){
+                h->_webSocketServer = shared_from_this();
+                h->socketOpen();
+            }
             if (_authorize) {
                 sendMessage(_authorize());
             }
@@ -98,7 +110,9 @@ void Client::initClient() {
         });
         _client->set_message_handler([&](websocketpp::connection_hdl hdl, message_ptr msg) {
             auto json = nlohmann::json::parse(msg->get_payload());
-            auto res = _messageHandler[json.at("type").get<std::string>()](hdl.lock(), json);
+            LOG(INFO)<<"on message "<<msg->get_payload();
+            std::string t = json.at("type").get<std::string>();
+            auto res = _messageHandler[t](hdl.lock(), json);
             if (!res.empty()) {
                 sendMessage(res);
             }

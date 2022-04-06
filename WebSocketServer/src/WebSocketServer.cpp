@@ -24,22 +24,18 @@ WebSocketHandler::~WebSocketHandler() {
 }
 
 void WebSocketServer::start() {
-    auto encoder = [](nlohmann::json msg) {
+    _encoder = [](nlohmann::json msg) {
         return msg.dump();
     };
-    auto decoder = [](std::string msg) -> nlohmann::json {
+    _decoder = [](std::string msg) -> nlohmann::json {
         return nlohmann::json::parse(msg);
     };
 
-    auto messageHandler = [](nlohmann::json msg, std::shared_ptr<void> client) {
-        return msg.dump();
-    };
-
-    auto checkAuth = [](std::string msg) -> nlohmann::json {
+    _checkAuth = [](std::string msg) -> nlohmann::json {
         return "";
     };
     _websocketServer = std::make_shared<InternalServer>();
-    auto closeClient = [&](std::shared_ptr<void> hdl) {
+    _disposeClient = [&](std::shared_ptr<void> hdl) {
         websocketpp::lib::error_code ec;
         _websocketServer->close(hdl, websocketpp::close::status::going_away, "", ec);
         if (ec) {
@@ -67,6 +63,7 @@ void WebSocketServer::start() {
         if (!response.empty()) {
             msg->set_payload(response);
             try {
+                LOG(INFO)<<"send message "<<response;
                 _websocketServer->send(hdl, msg);
             } catch (...) {
                 websocketpp::lib::error_code ec;

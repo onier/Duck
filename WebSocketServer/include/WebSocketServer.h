@@ -19,10 +19,10 @@ namespace Duck {
         struct WebSocketHandler {
             virtual ~WebSocketHandler();
 
-            virtual std::string getType() {};
+            virtual std::string getType() {return "";};
 
 //    <std::string(Message, Client)>
-            virtual std::string handMessage(nlohmann::json json, std::shared_ptr<void> client) {};
+            virtual std::string handMessage(nlohmann::json json, std::shared_ptr<void> client) {return "";};
 
             std::weak_ptr<WebSocketServer> _webSocketServer;
         };

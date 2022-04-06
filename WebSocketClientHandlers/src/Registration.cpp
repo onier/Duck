@@ -4,7 +4,7 @@
 RTTR_PLUGIN_REGISTRATION {
     rttr::registration::class_<WebClientAuthorizeHandler>("WebClientAuthorizeHandler")
             (
-                    rttr::metadata("key", "WebClientServerHandler")
+                    rttr::metadata("key", "WebSocketClientHandler")
             )
             .constructor<>()
                     (

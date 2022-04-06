@@ -19,8 +19,9 @@ typedef websocketpp::config::asio_client::message_type::ptr message_ptr;
 #include "Library.h"
 
 int main(int argc, char *argv[]) {
+    puppy::common::library::loadDefaultLibrary();
     std::shared_ptr<Client> webSocketClient = std::make_shared<Client>("ws://localhost:9002");
-    auto handlers = puppy::common::library::get<WebSocketHandler>("WebClientServerHandler");
+    auto handlers = puppy::common::library::get<WebSocketHandler>("WebSocketClientHandler");
     for (auto &hand : handlers) {
         webSocketClient->addWebSocketHandler(hand);
     }
