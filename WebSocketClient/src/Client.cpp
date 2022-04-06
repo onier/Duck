@@ -7,17 +7,12 @@
 #include <chrono>
 #include <thread>
 
+using namespace Duck::WebSocketClient;
+
 Client::Client(std::string url) {
     _url = url;
     _executor = std::make_shared<puppy::common::Executor>(1);
     _sendExecutor = std::make_shared<puppy::common::Executor>(1);
-    _executor->postTask([&]() {
-        initClient();
-    });
-    using namespace std::chrono_literals;
-    while (!_isConnected) {
-        std::this_thread::sleep_for(200ms);
-    }
 }
 
 void Client::addHandler(std::string type, MessageHandler function) {
@@ -46,14 +41,36 @@ void Client::setHeartbeat(Heartbeat heartbeat) {
     _heartBeat = heartbeat;
 }
 
+WebSocketHandler::~WebSocketHandler() {
+
+}
+
+void Client::connect() {
+    _executor->postTask([&]() {
+        initClient();
+    });
+    using namespace std::chrono_literals;
+    while (!_isConnected) {
+        std::this_thread::sleep_for(200ms);
+    }
+}
+
+void Client::addWebSocketHandler(std::shared_ptr<WebSocketHandler> webSocketHandler) {
+    webSocketHandler->_webSocketServer = shared_from_this();
+    addHandler(webSocketHandler->getType(),
+               [webSocketHandler](std::shared_ptr<void> client, nlohmann::json json) -> std::string {
+                   webSocketHandler->handMessage(json, client);
+               });
+}
+
 void Client::sendHeartBeat() {
-    _sendExecutor->postTask([&](){
-        if(_heartBeat && _isConnected){
+    _sendExecutor->postTask([&]() {
+        if (_heartBeat && _isConnected) {
             sendMessage(_heartBeat());
         }
-        _sendExecutor->postTimerTaskSecond([&](){
+        _sendExecutor->postTimerTaskSecond([&]() {
             sendHeartBeat();
-        },1);
+        }, 1);
     });
 }
 

@@ -24,10 +24,10 @@ namespace Duck {
 //    <std::string(Message, Client)>
             virtual std::string handMessage(nlohmann::json json, std::shared_ptr<void> client) {};
 
-            WebSocketServer *webSocketServer;
+            std::weak_ptr<WebSocketServer> _webSocketServer;
         };
 
-        class WebSocketServer : public Server<std::shared_ptr<void>, nlohmann::json, nlohmann::json> {
+    class WebSocketServer : public Server<std::shared_ptr<void>, nlohmann::json, nlohmann::json>, public std::enable_shared_from_this<WebSocketServer> {
         public:
             WebSocketServer(int port);
 

@@ -37,10 +37,12 @@ namespace Duck {
 //    <std::string(Message, Client)>
             virtual std::string handMessage(nlohmann::json json, std::shared_ptr<void> client) {};
 
-            Client *webSocketServer;
+            virtual void socketOpen() {};
+
+            std::weak_ptr<Client> _webSocketServer;
         };
 
-        class Client {
+        class Client : public std::enable_shared_from_this<Client> {
         public:
             Client(std::string url);
 
@@ -51,6 +53,10 @@ namespace Duck {
             void setAuthorize(Authorize authorize);
 
             void setHeartbeat(Heartbeat heartbeat);
+
+            void addWebSocketHandler(std::shared_ptr<WebSocketHandler> webSocketHandlers);
+
+            void connect();
 
         private:
             void initClient();

@@ -12,7 +12,7 @@ WebSocketServer::WebSocketServer(int port) {
 
 void WebSocketServer::addWebSocketHandler(std::shared_ptr<WebSocketHandler> wsh) {
     _webSocketHandlers.push_back(wsh);
-    wsh->webSocketServer = this;
+    wsh->_webSocketServer = shared_from_this();
     LOG(INFO) << "addWebSocketHandler " << wsh->getType();
     addHandler(wsh->getType(), [wsh](nlohmann::json json, std::shared_ptr<void> client) {
         return wsh->handMessage(json, client);

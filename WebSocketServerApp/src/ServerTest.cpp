@@ -42,14 +42,14 @@ void on_message(server *s, websocketpp::connection_hdl hdl, message_ptr msg) {
 int main() {
     using namespace Duck::WebSocketServer;
     puppy::common::library::loadDefaultLibrary();
-    WebSocketServer webSocketServer(9002);
+    std::shared_ptr<WebSocketServer> webSocketServer = std::make_shared<WebSocketServer>(9002);
     auto values = puppy::common::library::get<WebSocketHandler>("WebSocketServerHandler");
     LOG(INFO) << values.size();
     auto handlers = puppy::common::library::get<WebSocketHandler>("WebSocketServerHandler");
     for (auto &hand : handlers) {
-        webSocketServer.addWebSocketHandler(hand);
+        webSocketServer->addWebSocketHandler(hand);
     }
-    webSocketServer.start();
+    webSocketServer->start();
 }
 
 int main1() {
