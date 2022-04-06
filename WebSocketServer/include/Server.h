@@ -70,7 +70,7 @@ struct Server {
         }
     }
 
-    void addValidClient(Auth auth,Client client){
+    void addValidClient(Auth auth, Client client) {
         _validClients.wlock()->push_back(std::make_tuple(auth, client, timeSinceEpochMillisec()));
     }
 
@@ -79,9 +79,15 @@ struct Server {
             LOG(ERROR) << " client check fail ,the client is not login";
             auto auth = _checkAuth(message);
             if (auth.empty()) {
-                LOG(ERROR) << " dispost error for check fail";
-                closeClient(client);
-                return "";
+                std::string response = _handlers.rlock()->at("Authorize")(message, client);
+                if (response.empty()) {
+                    LOG(ERROR) << " dispost error for check fail";
+                    closeClient(client);
+                    return "";
+                }else{
+                    _validClients.wlock()->push_back(std::make_tuple(_decoder(response), client, timeSinceEpochMillisec()));
+                    return response;
+                }
             } else {
                 LOG(INFO) << " check user pass add new login user";
                 _validClients.wlock()->push_back(std::make_tuple(auth, client, timeSinceEpochMillisec()));
@@ -148,17 +154,17 @@ private:
     }
 
     void checkHeartBeat() {
-        LOG(INFO)<<" start checkHeartBeat";
+        LOG(INFO) << " start checkHeartBeat";
         _heartBeatExecutor->postTimerTaskSecond([&]() {
             auto lock = _validClients.wlock();
             auto current = timeSinceEpochMillisec();
             size_t n = lock->size();
             for (int i = 0; i < n; i++) {
                 auto &item = lock->at(i);
-                long temp= current - std::get<2>(item);
+                long temp = current - std::get<2>(item);
                 if (temp > _timeOutSecond * 1000) {
-                    if (_enableHeartBeat){
-                        LOG(ERROR)<<" close client for timeout";
+                    if (_enableHeartBeat) {
+                        LOG(ERROR) << " close client for timeout";
                         _disposeClient(std::get<1>(item));
                     }
                 }

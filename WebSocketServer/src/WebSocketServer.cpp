@@ -4,8 +4,23 @@
 
 #include "WebSocketServer.h"
 
+using namespace Duck::WebSocketServer;
+
 WebSocketServer::WebSocketServer(int port) {
     _port = port;
+}
+
+void WebSocketServer::addWebSocketHandler(std::shared_ptr<WebSocketHandler> wsh) {
+    _webSocketHandlers.push_back(wsh);
+    wsh->webSocketServer = this;
+    LOG(INFO) << "addWebSocketHandler " << wsh->getType();
+    addHandler(wsh->getType(), [wsh](nlohmann::json json, std::shared_ptr<void> client) {
+        return wsh->handMessage(json, client);
+    });
+}
+
+WebSocketHandler::~WebSocketHandler() {
+
 }
 
 void WebSocketServer::start() {
@@ -21,7 +36,7 @@ void WebSocketServer::start() {
     };
 
     auto checkAuth = [](std::string msg) -> nlohmann::json {
-        return nlohmann::json::parse(msg);
+        return "";
     };
     _websocketServer = std::make_shared<InternalServer>();
     auto closeClient = [&](std::shared_ptr<void> hdl) {

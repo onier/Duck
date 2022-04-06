@@ -7,52 +7,68 @@
 
 #include <websocketpp/config/asio_no_tls_client.hpp>
 #include <websocketpp/client.hpp>
-
+#include "Executor.h"
 #include <iostream>
 #include "nlohmann/json.hpp"
 #include "atomic"
 
-typedef websocketpp::client<websocketpp::config::asio_client> client;
+namespace Duck {
+    namespace WebSocketClient {
+        typedef websocketpp::client<websocketpp::config::asio_client> client;
 
-using websocketpp::lib::placeholders::_1;
-using websocketpp::lib::placeholders::_2;
-using websocketpp::lib::bind;
+        using websocketpp::lib::placeholders::_1;
+        using websocketpp::lib::placeholders::_2;
+        using websocketpp::lib::bind;
 
 // pull out the type of messages sent by our config
-typedef websocketpp::config::asio_client::message_type::ptr message_ptr;
-typedef std::function<std::string(std::shared_ptr<void>, nlohmann::json)> MessageHandler;
+        typedef websocketpp::config::asio_client::message_type::ptr message_ptr;
+        typedef std::function<std::string(std::shared_ptr<void>, nlohmann::json)> MessageHandler;
 
-#include "Executor.h"
-typedef std::function<std::string()> Authorize;
-typedef std::function<std::string()> Heartbeat;
-class Client {
-public:
-    Client(std::string url);
+        typedef std::function<std::string()> Authorize;
+        typedef std::function<std::string()> Heartbeat;
 
-    void addHandler(std::string type, MessageHandler function);
+        class Client;
 
-    bool sendMessage(std::string msg);
+        struct WebSocketHandler {
+            virtual ~WebSocketHandler();
 
-    void setAuthorize(Authorize authorize);
+            virtual std::string getType() {};
 
-    void setHeartbeat(Heartbeat heartbeat);
+//    <std::string(Message, Client)>
+            virtual std::string handMessage(nlohmann::json json, std::shared_ptr<void> client) {};
 
-private:
-    void initClient();
+            Client *webSocketServer;
+        };
 
-    void sendHeartBeat();
+        class Client {
+        public:
+            Client(std::string url);
 
-private:
-    std::shared_ptr<client> _client;
-    std::string _url;
-    std::map<std::string, MessageHandler> _messageHandler;
-    std::shared_ptr<puppy::common::Executor> _executor;
-    std::shared_ptr<puppy::common::Executor> _sendExecutor;
-    std::atomic_bool _isConnected;
-    client::connection_ptr _currentConnection;
-    Authorize  _authorize;
-    Heartbeat _heartBeat;
-};
+            void addHandler(std::string type, MessageHandler function);
 
+            bool sendMessage(std::string msg);
+
+            void setAuthorize(Authorize authorize);
+
+            void setHeartbeat(Heartbeat heartbeat);
+
+        private:
+            void initClient();
+
+            void sendHeartBeat();
+
+        private:
+            std::shared_ptr<client> _client;
+            std::string _url;
+            std::map<std::string, MessageHandler> _messageHandler;
+            std::shared_ptr<puppy::common::Executor> _executor;
+            std::shared_ptr<puppy::common::Executor> _sendExecutor;
+            std::atomic_bool _isConnected;
+            client::connection_ptr _currentConnection;
+            Authorize _authorize;
+            Heartbeat _heartBeat;
+        };
+    }
+}
 
 #endif //PUPPY_CLIENT_H
